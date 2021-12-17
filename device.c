@@ -42,7 +42,6 @@
 #include "cdba-server.h"
 #include "device.h"
 #include "fastboot.h"
-#include "console.h"
 #include "list.h"
 
 #define ARRAY_SIZE(x) ((sizeof(x)/sizeof((x)[0])))
@@ -116,21 +115,21 @@ struct device *device_open(const char *board,
 	return NULL;
 
 found:
-	assert(device->open || device->console_dev);
-
 	if (!device_check_access(device, username))
 		return NULL;
 
+	assert(device->console_ops);
+
 	device_lock(device);
 
-	if (device->open) {
-		device->cdb = device->open(device);
+	if (device->control_ops && device->control_ops->open) {
+		device->cdb = device->control_ops->open(device);
 		if (!device->cdb)
 			errx(1, "failed to open device controller");
 	}
 
-	if (device->console_dev)
-		console_open(device);
+	if (device->console_ops->open)
+		device->console_ops->open(device);
 
 	if (device->usb_always_on)
 		device_usb(device, true);
@@ -142,13 +141,13 @@ found:
 
 static void device_impl_power(struct device *device, bool on)
 {
-	device->power(device, on);
+	device->control_ops->power(device, on);
 }
 
 static void device_key(struct device *device, int key, bool asserted)
 {
-	if (device->key)
-		device->key(device, key, asserted);
+	if (device->control_ops && device->control_ops->key)
+		device->control_ops->key(device, key, asserted);
 }
 
 enum {
@@ -217,7 +216,7 @@ static void device_tick(void *data)
 
 static int device_power_on(struct device *device)
 {
-	if (!device || !device->power)
+	if (!device || !device->control_ops || !device->control_ops->power)
 		return 0;
 
 	device->state = DEVICE_STATE_START;
@@ -228,10 +227,10 @@ static int device_power_on(struct device *device)
 
 static int device_power_off(struct device *device)
 {
-	if (!device || !device->power)
+	if (!device || !device->control_ops || !device->control_ops->power)
 		return 0;
 
-	device->power(device, false);
+	device->control_ops->power(device, false);
 
 	return 0;
 }
@@ -246,14 +245,14 @@ int device_power(struct device *device, bool on)
 
 void device_print_status(struct device *device)
 {
-	if (device->print_status)
-		device->print_status(device);
+	if (device->control_ops && device->control_ops->print_status)
+		device->control_ops->print_status(device);
 }
 
 void device_usb(struct device *device, bool on)
 {
-	if (device->usb)
-		device->usb(device, on);
+	if (device->control_ops && device->control_ops->usb)
+		device->control_ops->usb(device, on);
 }
 
 int device_write(struct device *device, const void *buf, size_t len)
@@ -261,9 +260,9 @@ int device_write(struct device *device, const void *buf, size_t len)
 	if (!device)
 		return 0;
 
-	assert(device->write);
+	assert(device->console_ops->write);
 
-	return device->write(device, buf, len);
+	return device->console_ops->write(device, buf, len);
 }
 
 void device_fastboot_boot(struct device *device)
@@ -288,8 +287,8 @@ void device_boot(struct device *device, const void *data, size_t len)
 
 void device_send_break(struct device *device)
 {
-	if (device->send_break)
-		device->send_break(device);
+	if (device->console_ops->send_break)
+		device->console_ops->send_break(device);
 }
 
 void device_list_devices(const char *username)
@@ -353,6 +352,6 @@ void device_close(struct device *dev)
 		device_usb(dev, false);
 	device_power(dev, false);
 
-	if (dev->close)
-		dev->close(dev);
+	if (dev->control_ops && dev->control_ops->close)
+		dev->control_ops->close(dev);
 }
