@@ -101,6 +101,8 @@ static bool device_check_access(struct device *device,
 	return false;
 }
 
+static int device_power_off(struct device *device);
+
 struct device *device_open(const char *board,
 			   const char *username,
 			   struct fastboot_ops *fastboot_ops)
@@ -133,6 +135,12 @@ found:
 	device->console = device->console_ops->open(device);
 	if (!device->console)
 		errx(1, "failed to open device console");
+
+	/* Power off before opening fastboot */
+	if (device->power_always_on) {
+		device_power_off(device);
+		sleep(2);
+	}
 
 	if (device->usb_always_on)
 		device_usb(device, true);
@@ -351,7 +359,8 @@ void device_close(struct device *dev)
 {
 	if (!dev->usb_always_on)
 		device_usb(dev, false);
-	device_power(dev, false);
+	if (!dev->power_always_on)
+		device_power(dev, false);
 
 	if (device_has_control(dev, close))
 		dev->control_ops->close(dev);
