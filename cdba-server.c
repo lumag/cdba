@@ -365,6 +365,8 @@ int main(int argc, char **argv)
 
 	signal(SIGPIPE, sigpipe_handler);
 
+	fprintf(stderr, "Starting cdba server\n");
+
 	username = getenv("CDBA_USER");
 
 	ret = device_parser(".cdba");
