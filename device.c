@@ -119,6 +119,8 @@ found:
 		return NULL;
 
 	assert(device->console_ops);
+	assert(device->console_ops->open);
+	assert(device->console_ops->write);
 
 	device_lock(device);
 
@@ -128,8 +130,9 @@ found:
 			errx(1, "failed to open device controller");
 	}
 
-	if (device->console_ops->open)
-		device->console_ops->open(device);
+	device->console = device->console_ops->open(device);
+	if (!device->console)
+		errx(1, "failed to open device console");
 
 	if (device->usb_always_on)
 		device_usb(device, true);
@@ -259,8 +262,6 @@ int device_write(struct device *device, const void *buf, size_t len)
 {
 	if (!device)
 		return 0;
-
-	assert(device->console_ops->write);
 
 	return device->console_ops->write(device, buf, len);
 }

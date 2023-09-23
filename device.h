@@ -19,7 +19,7 @@ struct control_ops {
 };
 
 struct console_ops {
-	void (*open)(struct device *dev);
+	void *(*open)(struct device *dev);
 	int (*write)(struct device *dev, const void *buf, size_t len);
 
 	void (*send_break)(struct device *dev);
@@ -49,9 +49,7 @@ struct device {
 	const char *set_active;
 
 	void *cdb;
-
-	int console_fd;
-	struct termios console_tios;
+	void *console;
 
 	struct list_head node;
 };

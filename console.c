@@ -32,10 +32,16 @@
 #include <sys/stat.h>
 
 #include <err.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "cdba-server.h"
 #include "device.h"
+
+struct console {
+	int console_fd;
+	struct termios console_tios;
+};
 
 static int console_data(int fd, void *data)
 {
@@ -55,23 +61,32 @@ static int console_data(int fd, void *data)
 	return 0;
 }
 
-void console_open(struct device *device)
+void *console_open(struct device *device)
 {
-	device->console_fd = tty_open(device->console_dev, &device->console_tios);
-	if (device->console_fd < 0)
+	struct console *console;
+
+	console = calloc(1, sizeof(*console));
+	console->console_fd = tty_open(device->console_dev, &console->console_tios);
+	if (console->console_fd < 0)
 		err(1, "failed to open %s", device->console_dev);
 
-	watch_add_readfd(device->console_fd, console_data, device);
+	watch_add_readfd(console->console_fd, console_data, device);
+
+	return console;
 }
 
 int console_write(struct device *device, const void *buf, size_t len)
 {
-	return write(device->console_fd, buf, len);;
+	struct console *console = device->console;
+
+	return write(console->console_fd, buf, len);;
 }
 
 void console_send_break(struct device *device)
 {
-	tcsendbreak(device->console_fd, 0);
+	struct console *console = device->console;
+
+	tcsendbreak(console->console_fd, 0);
 }
 
 const struct console_ops console_ops = {

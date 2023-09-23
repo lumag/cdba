@@ -334,11 +334,17 @@ int conmux_write(struct device *dev, const void *buf, size_t len)
 	return write(conmux->fd, buf, len);
 }
 
+void *conmux_console_open(struct device *dev)
+{
+	return dev->cdb;
+}
+
 const struct control_ops conmux_ops = {
 	.open = conmux_open,
 	.power = conmux_power,
 };
 
 const struct console_ops conmux_console_ops = {
+	.open = conmux_console_open,
 	.write = conmux_write,
 };
